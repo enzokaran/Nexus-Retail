@@ -5,7 +5,7 @@
 *{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 button,input,select{font:inherit;color:inherit}button{cursor:pointer;background:var(--pn2);border:1px solid var(--bd);border-radius:8px;padding:7px 12px}button:hover{border-color:var(--ac)}
 button.p{background:var(--ac);border-color:var(--ac);color:#111;font-weight:600}input,select{background:var(--pn2);border:1px solid var(--bd);border-radius:8px;padding:8px 10px;max-width:100%}
-#login{min-height:90vh;display:grid;place-items:center;padding:16px}.lb{width:360px;max-width:100%;background:var(--pn);border:1px solid var(--bd);border-radius:14px;padding:28px}.lb input{width:100%;margin:6px 0 12px}
+[hidden]{display:none!important}
 .logo{font-weight:800;font-size:22px;letter-spacing:.5px}.logo b{color:var(--ac)}.mu{color:var(--mu)}.sm{font-size:12px}
 #app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}nav{background:var(--pn);border-right:1px solid var(--bd);padding:16px 10px;position:sticky;top:0;height:100vh}
 nav .logo{padding:0 8px 16px}nav a{display:block;padding:9px 12px;border-radius:8px;color:var(--mu);cursor:pointer;margin-bottom:2px}nav a:hover{background:var(--pn2)}nav a.on{background:var(--ac);color:#111;font-weight:600}
@@ -22,10 +22,6 @@ a.l{color:var(--ac);cursor:pointer}#md{position:fixed;inset:0;background:#000a;d
 @media(max-width:800px){#app{grid-template-columns:1fr}nav{height:auto;position:static;display:flex;overflow-x:auto;gap:4px;padding:8px}nav .logo{display:none}nav a{white-space:nowrap;margin:0}.pos{grid-template-columns:1fr}}
 .nat{background:var(--pn2);border:1px solid var(--bd);border-radius:10px;padding:12px;cursor:pointer;transition:border-color .15s,transform .15s}.nat:hover{border-color:var(--ac);transform:translateY(-2px)}.nat.on{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac) inset}.nat .uf{font-size:22px;font-weight:800;letter-spacing:.5px}.nat .uf b{color:var(--ac)}.nat .tr{height:6px;border-radius:99px;background:var(--bd);margin:8px 0}.nat .tr i{display:block;height:100%;border-radius:99px;background:var(--ac)}.nat .al{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}.nat button{margin-top:8px;padding:4px 8px;font-size:12px}
 @media print{nav,header,.noprint,#md,#ts{display:none!important}*{color:#000!important;background:#fff!important;box-shadow:none!important}}</style></head><body>
-<div id="login"><div class="lb"><div class="logo">NEXUS<b>.</b>RETAIL</div><p class="mu sm">Ambiente de demonstração · dados fictícios</p>
-<label class="sm mu">E-mail</label><input id="lu" type="email" autocomplete="username" placeholder="voce@email.com"><label class="sm mu">Senha</label><input id="lp" type="password" autocomplete="current-password" onkeydown="event.key=='Enter'&&login()">
-<button id="lb" class="p" style="width:100%" onclick="login()">Entrar</button><p class="sm mu">Acesso restrito: as contas são criadas pelo administrador.</p>
-</div></div>
 <div id="app" hidden><nav id="nv"></nav><div><header><select id="ss" onchange="sc=this.value=='all'?'all':+this.value;go()"></select><input id="gs" placeholder="Busca global (produto, marca, EAN)…" onkeydown="if(event.key=='Enter'){F.q=this.value;view='est';go()}"><span class="sp"></span><span id="bell" class="b or"></span><span id="who" class="sm"></span><button onclick="logout()">Sair</button></header><main id="mn"></main></div></div>
 <div id="md" onclick="if(event.target==this)cl()"><div id="mb"></div></div><div id="ts"></div>
 <script>
@@ -82,16 +78,16 @@ const bars=(v,l,h=150)=>{const m=Math.max(...v,1),w=100/v.length;return`<svg vie
 const daily=(arr,n)=>{const v=Array(n).fill(0),l=[];for(let i=0;i<n;i++)l.push(new Date(now-(n-1-i)*D).getDate());arr.forEach(x=>{const k=n-1-Math.floor((now-x.t)/D);if(k>=0&&k<n)v[k]+=x.v});return[v,l]};
 const SBU='https://tihpybfswxsxvcbcsytr.supabase.co',SBK='sb_publishable_fvOeEzfwzd_OTaSd2iOerg_g3Wn8dcg';let tok=null,rtk=null,UP=[];
 const sbf=(p,o={})=>{const h={apikey:SBK,'Content-Type':'application/json',...(o.h||{})};if(tok&&!o.anon)h.Authorization='Bearer '+tok;return fetch(SBU+p,{method:o.m||'GET',headers:h,body:o.b?JSON.stringify(o.b):undefined})};
-function keep(d){tok=d.access_token;rtk=d.refresh_token;try{sessionStorage.setItem('nxs',JSON.stringify({r:rtk}))}catch(e){}}
+function keep(d){tok=d.access_token;rtk=d.refresh_token;const z=JSON.stringify({r:rtk});try{sessionStorage.setItem('nxs',z);if(localStorage.getItem('nxs'))localStorage.setItem('nxs',z)}catch(e){}}
 async function refresh(){if(!rtk)return false;const r=await sbf('/auth/v1/token?grant_type=refresh_token',{m:'POST',anon:1,b:{refresh_token:rtk}});if(!r.ok)return false;keep(await r.json());return true}
 async function api(p,o={}){let r=await sbf(p,o);if(r.status==401&&await refresh())r=await sbf(p,o);return r}
 async function perfil(id){const r=await api('/rest/v1/perfis?select=nome,papel,ativo&id=eq.'+id);if(!r.ok)return null;return(await r.json())[0]||null}
 const role=p=>p=='caixa'?'func':p;
 const setMe=(id,email,p)=>{me={id,u:email,n:p.nome,r:role(p.papel)}};
-async function out(){try{if(tok)await sbf('/auth/v1/logout',{m:'POST'})}catch(e){}tok=rtk=null;try{sessionStorage.removeItem('nxs')}catch(e){}}
-async function login(){const e=$('#lu').value.trim().toLowerCase(),pw=$('#lp').value,b=$('#lb');if(!e||!pw)return toast('Informe e-mail e senha');b.disabled=true;try{const r=await sbf('/auth/v1/token?grant_type=password',{m:'POST',anon:1,b:{email:e,password:pw}});if(!r.ok)return toast(r.status==400?'E-mail ou senha inválidos':'Não foi possível entrar agora (erro '+r.status+')');const d=await r.json();keep(d);const p=await perfil(d.user.id);if(!p||!p.ativo||!PM[role(p.papel)]){await out();return toast('Conta sem perfil ativo. Fale com o administrador.')}setMe(d.user.id,e,p);audit('Login realizado');start()}catch(x){toast('Sem conexão com o servidor')}finally{b.disabled=false}}
-async function logout(){await out();location.reload()}
-function start(){$('#login').hidden=true;$('#app').hidden=false;$('#ss').innerHTML='<option value="all">Todas as unidades</option>'+S.map(s=>`<option value="${s.id}">${s.n} — ${s.uf}</option>`).join('');$('#who').textContent=me.n+' · '+me.r;$('#nv').innerHTML='<div class="logo">NEXUS<b>.</b>RETAIL</div>'+PM[me.r].map(k=>`<a id="n_${k}" onclick="view='${k}';go()">${V[k]}</a>`).join('');view=PM[me.r][0];go()}
+async function out(){try{if(tok)await sbf('/auth/v1/logout',{m:'POST'})}catch(e){}tok=rtk=null;try{sessionStorage.removeItem('nxs');sessionStorage.removeItem('nxl');localStorage.removeItem('nxs')}catch(e){}}
+const toLogin=m=>location.replace('login.html'+(m?'?m='+m:''));
+async function logout(){await out();toLogin()}
+function start(){$('#app').hidden=false;try{if(sessionStorage.getItem('nxl')){sessionStorage.removeItem('nxl');audit('Login realizado')}}catch(e){}$('#ss').innerHTML='<option value="all">Todas as unidades</option>'+S.map(s=>`<option value="${s.id}">${s.n} — ${s.uf}</option>`).join('');$('#who').textContent=me.n+' · '+me.r;$('#nv').innerHTML='<div class="logo">NEXUS<b>.</b>RETAIL</div>'+PM[me.r].map(k=>`<a id="n_${k}" onclick="view='${k}';go()">${V[k]}</a>`).join('');view=PM[me.r][0];go()}
 const can=k=>PM[me.r].includes(k);
 function go(){document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',a.id=='n_'+view));const al=DB.B.filter(b=>sIn(b.s)&&dd(b)<=7).length;$('#bell').textContent='🔔 '+al+' alertas';$('#mn').innerHTML=`<h2>${V[view]}</h2>`+R[view]()}
 const sel=(id,opts,v)=>`<select id="${id}" onchange="F['${id}']=this.value;go()"><option value="">${id=='cat'?'Categoria':'Marca'}</option>${opts.map(o=>`<option ${o==v?'selected':''}>${o}</option>`).join('')}</select>`;
@@ -189,5 +185,10 @@ function padd(c){c=(c||'').trim();const p=P.find(x=>x.ean==c||x.sku==c),s=sc=='a
 function cq(k,d){const s=sc=='all'?0:sc,i=cart[k];if(i.q+d>qv(i.p,s))return toast('Estoque insuficiente (lotes vencidos não são vendidos)');i.q+=d;if(i.q<1)cart.splice(k,1);go()}
 function fin(s){if(!cart.length)return toast('Carrinho vazio');const it=cart.map(i=>({p:i.p,q:i.q,pr:pv(i.p,s)*(1-disc/100)}));cart.forEach(i=>{let n=i.q;DB.B.filter(b=>b.p==i.p&&b.s==s&&b.q>0&&b.val>Date.now()).sort((a,b)=>a.val-b.val).forEach(b=>{const t=Math.min(n,b.q);b.q-=t;n-=t});DB.mov.push({t:Date.now(),s,p:i.p,ty:'Venda PDV',q:-i.q})});const tot=it.reduce((a,x)=>a+x.q*x.pr,0);DB.sales.push({id:DB.sales.length+1,t:Date.now(),s,pay,it,tot,op:me.n});audit('Venda PDV '+fmt(tot)+' · '+S[s].n+' · '+pay);cart=[];disc=0;go();toast('Venda registrada: '+fmt(tot)+' — estoque atualizado (FEFO)')}
 async function cam(cb){if(!('BarcodeDetector' in window))return toast('Leitura por câmera indisponível neste navegador');try{op('<video id=vv autoplay playsinline style="width:100%;border-radius:10px"></video><p class=mu>Aponte para o código…</p>');window.cs=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});$('#vv').srcObject=cs;const d=new BarcodeDetector();const lp=async()=>{if(!window.cs)return;try{const c=await d.detect($('#vv'));if(c.length){const v=c[0].rawValue;cl();return cb(v)}}catch(e){}setTimeout(lp,400)};lp()}catch(e){cl();toast('Câmera indisponível')}}
-(async()=>{try{const z=JSON.parse(sessionStorage.getItem('nxs')||'null');if(!z||!z.r)return;rtk=z.r;if(!await refresh())return;const r=await sbf('/auth/v1/user');if(!r.ok)return;const u=await r.json(),p=await perfil(u.id);if(p&&p.ativo&&PM[role(p.papel)]){setMe(u.id,u.email,p);start()}}catch(e){}})();
+(async()=>{let z=null;try{z=JSON.parse(sessionStorage.getItem('nxs')||localStorage.getItem('nxs')||'null')}catch(e){}
+if(!z||!z.r)return toLogin();
+try{rtk=z.r;if(!await refresh()){await out();return toLogin('expirou')}
+const r=await sbf('/auth/v1/user');if(!r.ok){await out();return toLogin('expirou')}
+const u=await r.json(),p=await perfil(u.id);
+if(p&&p.ativo&&PM[role(p.papel)]){setMe(u.id,u.email,p);start()}else{await out();toLogin('perfil')}}catch(e){toLogin('rede')}})();
 </script></body></html>
