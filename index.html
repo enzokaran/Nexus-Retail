@@ -82,12 +82,33 @@ function keep(d){tok=d.access_token;rtk=d.refresh_token;const z=JSON.stringify({
 async function refresh(){if(!rtk)return false;const r=await sbf('/auth/v1/token?grant_type=refresh_token',{m:'POST',anon:1,b:{refresh_token:rtk}});if(!r.ok)return false;keep(await r.json());return true}
 async function api(p,o={}){let r=await sbf(p,o);if(r.status==401&&await refresh())r=await sbf(p,o);return r}
 async function perfil(id){const r=await api('/rest/v1/perfis?select=nome,papel,ativo&id=eq.'+id);if(!r.ok)return null;return(await r.json())[0]||null}
+/* ===== Catálogo no Supabase (fase 1): unidades, fornecedores e produtos =====
+   Preços, lotes, vendas, promoções e auditoria continuam locais por enquanto. Se algo falhar, o site usa os dados locais. */
+let FONTE='local',FERR='';
+async function lerTabela(t,cols){let out=[],off=0;for(;;){const r=await api('/rest/v1/'+t+'?select='+cols+'&order=id.asc&limit=1000&offset='+off);if(!r.ok)throw new Error(t+': erro '+r.status);const a=await r.json();out=out.concat(a);if(a.length<1000)return out;off+=1000}}
+async function carregarCatalogo(){
+const[a,f,p]=await Promise.all([lerTabela('supermercados','id,nome,uf,cidade,gerente,cnpj,endereco,funcionarios,caixas'),lerTabela('fornecedores','id,nome,cnpj'),lerTabela('produtos','id,categoria,nome,marca,preco_base,custo,ean,sku,estoque_minimo,popularidade,fornecedor_id,unidade_medida')]);
+const seq=x=>x.every((y,i)=>+y.id===i);
+if(!a.length||!f.length||!p.length)throw new Error('tabelas vazias (rode o 02_dados_demo.sql)');
+if(!seq(a)||!seq(f)||!seq(p))throw new Error('os ids precisam ser 0, 1, 2… sem buracos');
+if(a.length!=S.length)throw new Error('o site espera '+S.length+' unidades e o banco tem '+a.length);
+if(p.some(x=>!(+x.fornecedor_id>=0&&+x.fornecedor_id<f.length)))throw new Error('produto com fornecedor inválido');
+if(DB.cp.length&&p.length!=(DB.nbase||NB))throw new Error('o catálogo mudou de tamanho e há produtos cadastrados neste navegador');
+const nS=a.map(x=>({id:+x.id,n:x.nome,uf:x.uf,c:x.cidade,g:x.gerente,cnpj:x.cnpj,f:+x.funcionarios,cx:+x.caixas,end:x.endereco}));
+const nF=f.map(x=>({n:x.nome,c:x.cnpj}));
+const nP=p.map(x=>({id:+x.id,cat:x.categoria,nm:x.nome,br:x.marca,base:+x.preco_base,cost:+x.custo,ean:x.ean,sku:x.sku,min:+x.estoque_minimo||0,pop:+x.popularidade||1,fn:nF[+x.fornecedor_id].n,fi:+x.fornecedor_id,un:x.unidade_medida||'un'}));
+S.splice(0,S.length,...nS);FNL.splice(0,FNL.length,...nF);P.splice(0,P.length,...nP);
+DB.cp.forEach(x=>{x.id=P.length;P.push(x)});DB.nbase=nP.length;
+while(DB.pr.length<P.length)DB.pr.push(S.map(()=>P[DB.pr.length].base));
+save()}
+async function usarCatalogo(){try{await carregarCatalogo();FONTE='supabase';FERR=''}catch(e){FONTE='local';FERR=String(e&&e.message||e).replace(/["<>]/g,'')}}
+const fonteHtml=()=>`<div class="sm mu" style="padding:18px 12px 0" title="${FONTE=='supabase'?'Unidades, fornecedores e produtos lidos do banco de dados':'Motivo: '+FERR}"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(${FONTE=='supabase'?'--ok':'--wa'})"></span>Catálogo: ${FONTE=='supabase'?'Supabase':'local (offline)'}</div>`;
 const role=p=>p=='caixa'?'func':p;
 const setMe=(id,email,p)=>{me={id,u:email,n:p.nome,r:role(p.papel)}};
 async function out(){try{if(tok)await sbf('/auth/v1/logout',{m:'POST'})}catch(e){}tok=rtk=null;try{sessionStorage.removeItem('nxs');sessionStorage.removeItem('nxl');localStorage.removeItem('nxs')}catch(e){}}
 const toLogin=m=>location.replace('login.html'+(m?'?m='+m:''));
 async function logout(){await out();toLogin()}
-function start(){$('#app').hidden=false;try{if(sessionStorage.getItem('nxl')){sessionStorage.removeItem('nxl');audit('Login realizado')}}catch(e){}$('#ss').innerHTML='<option value="all">Todas as unidades</option>'+S.map(s=>`<option value="${s.id}">${s.n} — ${s.uf}</option>`).join('');$('#who').textContent=me.n+' · '+me.r;$('#nv').innerHTML='<div class="logo">NEXUS<b>.</b>RETAIL</div>'+PM[me.r].map(k=>`<a id="n_${k}" onclick="view='${k}';go()">${V[k]}</a>`).join('');view=PM[me.r][0];go()}
+function start(){$('#app').hidden=false;try{if(sessionStorage.getItem('nxl')){sessionStorage.removeItem('nxl');audit('Login realizado')}}catch(e){}$('#ss').innerHTML='<option value="all">Todas as unidades</option>'+S.map(s=>`<option value="${s.id}">${s.n} — ${s.uf}</option>`).join('');$('#who').textContent=me.n+' · '+me.r;$('#nv').innerHTML='<div class="logo">NEXUS<b>.</b>RETAIL</div>'+PM[me.r].map(k=>`<a id="n_${k}" onclick="view='${k}';go()">${V[k]}</a>`).join('')+fonteHtml();view=PM[me.r][0];go()}
 const can=k=>PM[me.r].includes(k);
 function go(){document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',a.id=='n_'+view));const al=DB.B.filter(b=>sIn(b.s)&&dd(b)<=7).length;$('#bell').textContent='🔔 '+al+' alertas';$('#mn').innerHTML=`<h2>${V[view]}</h2>`+R[view]()}
 const sel=(id,opts,v)=>`<select id="${id}" onchange="F['${id}']=this.value;go()"><option value="">${id=='cat'?'Categoria':'Marca'}</option>${opts.map(o=>`<option ${o==v?'selected':''}>${o}</option>`).join('')}</select>`;
@@ -99,7 +120,7 @@ op(`<div style="display:flex;justify-content:space-between"><h2>${p.nm}</h2><but
 <div class=tw><table><tr><th>Unidade<th>Qtd<th>Preço<th>Última venda<th>Status</tr>${S.map(s=>{const q=qty(id,s.id),l=L.find(x=>x.s==s.id);return`<tr><td>${s.n}<td>${q}<td>${fmt(DB.pr[id][s.id])}<td>${l?dtm(l.t):'—'}<td>${sb(q,p.min)}`}).join('')}</table></div>
 <h3>Lotes</h3><div class=tw><table><tr><th>Lote<th>Unidade<th>Qtd<th>Fabricação<th>Validade<th>Situação</tr>${DB.B.filter(b=>b.p==id).sort((a,b)=>a.val-b.val).map(b=>`<tr><td>${b.l}<td>${S[b.s].n}<td>${b.q}<td>${dt(b.fab)}<td>${dt(b.val)}<td>${vb(dd(b))}`).join('')}</table></div>`)}
 function rg(){if(!me||me.r!='admin')return;op(`<h3>Regenerar dados de demonstração</h3><p class=mu>Recria vendas, lotes, estoque, preços, notas fiscais e movimentações com datas a partir de hoje.</p><p class=sm><b>Será apagado:</b> promoções e alterações de preço feitas por você.<br><b>Será mantido:</b> usuários, auditoria e produtos cadastrados no Código de barras.</p><button class=p onclick="rg2()">Regenerar agora</button> <button onclick="cl()">Cancelar</button>`)}
-function rg2(){if(!me||me.r!='admin')return;const ex=P.splice(NB),old=DB;seed=7;const nd=seedDB();P.push(...ex);ex.forEach(p=>nd.pr.push(old.pr[p.id]||S.map(()=>p.base)));nd.us=old.us;nd.aud=old.aud;nd.cp=old.cp;nd.promo=[];DB=nd;cart=[];disc=0;audit('Regenerou os dados de demonstração (datas a partir de hoje)');cl();go();toast('Dados de demonstração regenerados com datas de hoje')}
+function rg2(){if(!me||me.r!='admin')return;const ex=P.splice(DB.nbase||NB),old=DB;seed=7;const nd=seedDB();P.push(...ex);ex.forEach(p=>nd.pr.push(old.pr[p.id]||S.map(()=>p.base)));nd.us=old.us;nd.aud=old.aud;nd.cp=old.cp;nd.nbase=old.nbase;nd.promo=[];DB=nd;cart=[];disc=0;audit('Regenerou os dados de demonstração (datas a partir de hoje)');cl();go();toast('Dados de demonstração regenerados com datas de hoje')}
 const R={
 dash(){return dash2()},
 est(){const rows=P.filter(p=>(!F.cat||p.cat==F.cat)&&(!F.br||p.br==F.br)&&(!F.q||(p.nm+p.br+p.ean+p.sku).toLowerCase().includes(F.q.toLowerCase())));
@@ -190,5 +211,5 @@ if(!z||!z.r)return toLogin();
 try{rtk=z.r;if(!await refresh()){await out();return toLogin('expirou')}
 const r=await sbf('/auth/v1/user');if(!r.ok){await out();return toLogin('expirou')}
 const u=await r.json(),p=await perfil(u.id);
-if(p&&p.ativo&&PM[role(p.papel)]){setMe(u.id,u.email,p);start()}else{await out();toLogin('perfil')}}catch(e){toLogin('rede')}})();
+if(p&&p.ativo&&PM[role(p.papel)]){setMe(u.id,u.email,p);await usarCatalogo();start();if(FONTE!='supabase')toast('Catálogo do Supabase indisponível: usando dados locais')}else{await out();toLogin('perfil')}}catch(e){toLogin('rede')}})();
 </script></body></html>
